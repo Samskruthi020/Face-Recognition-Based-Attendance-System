@@ -201,6 +201,8 @@ vote = Σ(weight * class)
 ## 5. Performance Analysis
 
 ### 5.1 Speed Analysis
+![Processing Time for Different Stages](images/processing_time.png)
+
 | Component | Time (ms) | Percentage |
 |-----------|-----------|------------|
 | Face Detection | 50 | 50% |
@@ -209,6 +211,8 @@ vote = Σ(weight * class)
 | **Total** | **100** | **100%** |
 
 ### 5.2 Accuracy Analysis
+![System Accuracy Metrics](images/accuracy_metrics.png)
+
 | Metric | Value | Confidence |
 |--------|-------|------------|
 | Face Detection Rate | 98% | ±1% |
@@ -217,11 +221,18 @@ vote = Σ(weight * class)
 | False Negative Rate | 3% | ±0.5% |
 
 ### 5.3 Resource Utilization
+![System Resource Usage](images/resource_usage.png)
+
 | Resource | Usage | Optimization |
 |----------|-------|--------------|
 | CPU | 15-20% | Multi-threading |
 | Memory | 500MB | Image Compression |
 | Storage | 1MB/student | Efficient Encoding |
+
+### 5.4 System Data Flow
+![System Data Flow](images/system_flow.png)
+
+The system data flow diagram illustrates the sequential processing of data from webcam capture through to attendance update, showing the interconnected stages of the face recognition pipeline.
 
 ## 6. Security Considerations
 
