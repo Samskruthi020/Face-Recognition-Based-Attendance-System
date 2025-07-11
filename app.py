@@ -1,6 +1,6 @@
 import cv2
 import os
-from flask import Flask, request, render_template, send_file
+from flask import Flask, request, render_template, send_file, jsonify
 from datetime import date
 from datetime import datetime
 import numpy as np
@@ -9,6 +9,9 @@ import pandas as pd
 import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+import base64
+import io
+from PIL import Image
 
 # Defining Flask App
 app = Flask(__name__)
@@ -340,6 +343,196 @@ def add():
 def download():
     path = f'Attendance/Attendance-{datetoday}.csv'
     return send_file(path, as_attachment=True)
+
+################## MOBILE API ENDPOINTS #########################
+
+# API endpoint to get attendance data
+@app.route('/api/attendance', methods=['GET'])
+def api_get_attendance():
+    try:
+        names, rolls, times, branches, l = extract_attendance()
+        attendance_data = []
+        for i in range(l):
+            attendance_data.append({
+                'name': names[i],
+                'roll': rolls[i],
+                'branch': branches[i],
+                'time': times[i]
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': attendance_data,
+            'total_users': totalreg(),
+            'date': datetoday2,
+            'count': l
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# API endpoint to get all registered users
+@app.route('/api/users', methods=['GET'])
+def api_get_users():
+    try:
+        userlist, names, rolls, l = getallusers()
+        users_data = []
+        for i in range(l):
+            users_data.append({
+                'name': names[i],
+                'roll': rolls[i],
+                'folder': userlist[i]
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': users_data,
+            'total': l
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# API endpoint to add new user via image upload
+@app.route('/api/add_user', methods=['POST'])
+def api_add_user():
+    try:
+        data = request.get_json()
+        newusername = data.get('name')
+        newuserid = data.get('roll')
+        branch = data.get('branch', 'CSE')
+        image_data = data.get('image')  # Base64 encoded image
+        
+        if not all([newusername, newuserid, image_data]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        # Create user folder
+        userimagefolder = f'static/faces/{newusername}_{str(newuserid)}'
+        if not os.path.isdir(userimagefolder):
+            os.makedirs(userimagefolder)
+        
+        # Decode base64 image
+        image_data = image_data.split(',')[1] if ',' in image_data else image_data
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Convert PIL image to OpenCV format
+        opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        
+        # Extract and save face
+        faces = extract_faces(opencv_image)
+        if len(faces) > 0:
+            (x, y, w, h) = faces[0]
+            face_img = opencv_image[y:y+h, x:x+w]
+            face_img = cv2.resize(face_img, (50, 50))
+            
+            # Save the image
+            filename = f'{userimagefolder}/{newusername}_0.jpg'
+            cv2.imwrite(filename, face_img)
+            
+            # Create multiple variations for better training
+            for i in range(1, 5):
+                # Add slight variations
+                variation = cv2.flip(face_img, 1) if i % 2 == 0 else face_img
+                variation_filename = f'{userimagefolder}/{newusername}_{i}.jpg'
+                cv2.imwrite(variation_filename, variation)
+            
+            # Train model
+            if train_model():
+                return jsonify({'success': True, 'message': 'User added successfully'})
+            else:
+                return jsonify({'success': False, 'error': 'Failed to train model'}), 500
+        else:
+            return jsonify({'success': False, 'error': 'No face detected in image'}), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# API endpoint for face recognition from uploaded image
+@app.route('/api/recognize', methods=['POST'])
+def api_recognize():
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+        
+        if not image_data:
+            return jsonify({'success': False, 'error': 'No image provided'}), 400
+        
+        # Check if model exists
+        if 'face_recognition_model.pkl' not in os.listdir('static'):
+            return jsonify({'success': False, 'error': 'No trained model found'}), 400
+        
+        # Decode base64 image
+        image_data = image_data.split(',')[1] if ',' in image_data else image_data
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Convert PIL image to OpenCV format
+        opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        
+        # Extract face and recognize
+        faces = extract_faces(opencv_image)
+        if len(faces) > 0:
+            (x, y, w, h) = faces[0]
+            face = cv2.resize(opencv_image[y:y+h, x:x+w], (50, 50))
+            identified_person = identify_face(face.reshape(1, -1))[0]
+            
+            # Add attendance if person is recognized
+            if identified_person != "Unknown":
+                add_attendance(identified_person)
+                username = identified_person.split('_')[0]
+                userid = identified_person.split('_')[1]
+                
+                return jsonify({
+                    'success': True,
+                    'recognized': True,
+                    'name': username,
+                    'roll': userid,
+                    'message': 'Attendance marked successfully'
+                })
+            else:
+                return jsonify({
+                    'success': True,
+                    'recognized': False,
+                    'message': 'Person not recognized'
+                })
+        else:
+            return jsonify({'success': False, 'error': 'No face detected in image'}), 400
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# API endpoint to delete user
+@app.route('/api/delete_user/<user_folder>', methods=['DELETE'])
+def api_delete_user(user_folder):
+    try:
+        folder_path = f'static/faces/{user_folder}'
+        if os.path.exists(folder_path):
+            deletefolder(folder_path)
+            
+            # Retrain model if there are still users
+            if os.listdir('static/faces/'):
+                train_model()
+            else:
+                # Remove model if no users left
+                if os.path.exists('static/face_recognition_model.pkl'):
+                    os.remove('static/face_recognition_model.pkl')
+            
+            return jsonify({'success': True, 'message': 'User deleted successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Mobile-friendly route
+@app.route('/mobile')
+def mobile():
+    names, rolls, times, branches, l = extract_attendance()
+    return render_template('mobile.html', names=names, rolls=rolls, times=times, branches=branches, l=l, totalreg=totalreg(), datetoday2=datetoday2)
+
+# Serve manifest.json
+@app.route('/static/manifest.json')
+def manifest():
+    return send_file('static/manifest.json', mimetype='application/json')
 
 # Our main function which runs the Flask App
 if __name__ == '__main__':

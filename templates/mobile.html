@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="theme-color" content="#007bff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Attendance App">
+    <title>Face Recognition Attendance - Mobile</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        .mobile-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .mobile-header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-align: center;
+            color: #333;
+        }
+
+        .mobile-container {
+            padding: 20px;
+            max-width: 100%;
+        }
+
+        .mobile-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .mobile-card h2 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .camera-container {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        }
+
+        #video {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 2px solid #007bff;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .mobile-btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #1e7e34);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107, #e0a800);
+            color: #212529;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+
+        .mobile-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .mobile-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status-message {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status-success {
+            background: rgba(40, 167, 69, 0.1);
+            color: #155724;
+            border: 1px solid rgba(40, 167, 69, 0.2);
+        }
+
+        .status-error {
+            background: rgba(220, 53, 69, 0.1);
+            color: #721c24;
+            border: 1px solid rgba(220, 53, 69, 0.2);
+        }
+
+        .status-info {
+            background: rgba(0, 123, 255, 0.1);
+            color: #004085;
+            border: 1px solid rgba(0, 123, 255, 0.2);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.9);
+        }
+
+        .attendance-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .attendance-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .attendance-item:last-child {
+            border-bottom: none;
+        }
+
+        .attendance-info {
+            flex: 1;
+        }
+
+        .attendance-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .attendance-details {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .attendance-time {
+            background: rgba(0, 123, 255, 0.1);
+            color: #007bff;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.9);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #007bff;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top: 3px solid #007bff;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-header">
+        <h1>📱 Attendance System</h1>
+    </div>
+
+    <div class="mobile-container">
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">{{totalreg}}</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{l}}</div>
+                <div class="stat-label">Present Today</div>
+            </div>
+        </div>
+
+        <!-- Date Display -->
+        <div class="mobile-card">
+            <h2>📅 {{datetoday2}}</h2>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('attendance')">📋 Attendance</button>
+            <button class="tab" onclick="switchTab('recognize')">📷 Recognize</button>
+            <button class="tab" onclick="switchTab('register')">👤 Register</button>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="statusMessage" class="status-message hidden"></div>
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <div>Processing...</div>
+        </div>
+
+        <!-- Attendance Tab -->
+        <div id="attendanceTab" class="tab-content active">
+            <div class="mobile-card">
+                <h2>Today's Attendance</h2>
+                <div class="attendance-list">
+                    {% if l %}
+                    {% for i in range(l) %}
+                    <div class="attendance-item">
+                        <div class="attendance-info">
+                            <div class="attendance-name">{{names[i]}}</div>
+                            <div class="attendance-details">Roll: {{rolls[i]}} • {{branches[i]}}</div>
+                        </div>
+                        <div class="attendance-time">{{times[i]}}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div style="text-align: center; color: #666; padding: 20px;">
+                        No attendance recorded today
+                    </div>
+                    {% endif %}
+                </div>
+                <button class="mobile-btn btn-success" onclick="downloadAttendance()">
+                    📥 Download CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Face Recognition Tab -->
+        <div id="recognizeTab" class="tab-content">
+            <div class="mobile-card">
+                <h2>📸 Take Attendance</h2>
+                <div class="camera-container">
+                    <video id="video" autoplay playsinline></video>
+                    <div class="camera-overlay"></div>
+                    <canvas id="canvas"></canvas>
+                </div>
+                <button id="startCamera" class="mobile-btn btn-primary" onclick="startCamera()">
+                    📹 Start Camera
+                </button>
+                <button id="capturePhoto" class="mobile-btn btn-success hidden" onclick="capturePhoto()">
+                    📸 Capture & Recognize
+                </button>
+                <button id="stopCamera" class="mobile-btn btn-danger hidden" onclick="stopCamera()">
+                    ⏹️ Stop Camera
+                </button>
+            </div>
+        </div>
+
+        <!-- User Registration Tab -->
+        <div id="registerTab" class="tab-content">
+            <div class="mobile-card">
+                <h2>👤 Register New User</h2>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="userName" class="form-control" required placeholder="Enter full name">
+                    </div>
+                    <div class="form-group">
+                        <label>Roll Number</label>
+                        <input type="number" id="userRoll" class="form-control" required placeholder="Enter roll number">
+                    </div>
+                    <div class="form-group">
+                        <label>Branch</label>
+                        <input type="text" id="userBranch" class="form-control" value="CSE" placeholder="Enter branch">
+                    </div>
+                </form>
+                <div class="camera-container">
+                    <video id="registerVideo" autoplay playsinline style="display: none;"></video>
+                    <canvas id="registerCanvas"></canvas>
+                </div>
+                <button id="startRegisterCamera" class="mobile-btn btn-primary" onclick="startRegisterCamera()">
+                    📹 Start Camera
+                </button>
+                <button id="captureRegister" class="mobile-btn btn-warning hidden" onclick="captureForRegistration()">
+                    📸 Capture Photo
+                </button>
+                <button id="submitRegister" class="mobile-btn btn-success hidden" onclick="submitRegistration()">
+                    ✅ Register User
+                </button>
+                <button id="stopRegisterCamera" class="mobile-btn btn-danger hidden" onclick="stopRegisterCamera()">
+                    ⏹️ Stop Camera
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stream = null;
+        let registerStream = null;
+        let capturedImageData = null;
+
+        // Tab switching functionality
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            // Stop any running cameras when switching tabs
+            if (stream) stopCamera();
+            if (registerStream) stopRegisterCamera();
+        }
+
+        // Show status messages
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message status-${type}`;
+            statusEl.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusEl.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Show/hide loading
+        function setLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // Camera functions for attendance
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                document.getElementById('startCamera').classList.add('hidden');
+                document.getElementById('capturePhoto').classList.remove('hidden');
+                document.getElementById('stopCamera').classList.remove('hidden');
+                
+                showStatus('Camera started successfully', 'success');
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                showStatus('Could not access camera. Please check permissions.', 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            document.getElementById('video').srcObject = null;
+            document.getElementById('startCamera').classList.remove('hidden');
+            document.getElementById('capturePhoto').classList.add('hidden');
+            document.getElementById('stopCamera').classList.add('hidden');
+            
+            showStatus('Camera stopped', 'info');
+        }
+
+        async function capturePhoto() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch('/api/recognize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image: imageData })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.recognized) {
+                    showStatus(`Welcome ${result.name}! Attendance marked successfully.`, 'success');
+                    // Refresh attendance list
+                    setTimeout(() => location.reload(), 2000);
+                } else if (result.success && !result.recognized) {
+                    showStatus('Face not recognized. Please try again or register first.', 'error');
+                } else {
+                    showStatus(result.error || 'Recognition failed', 'error');
+                }
+            } catch (err) {
+                console.error('Recognition error:', err);
+                showStatus('Network error. Please try again.', 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Registration camera functions
+        async function startRegisterCamera() {
+            try {
+                registerStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
+                });
+                
+                const video = document.getElementById('registerVideo');
+                video.srcObject = registerStream;
+                video.style.display = 'block';
+                
+                document.getElementById('startRegisterCamera').classList.add('hidden');
+                document.getElementById('captureRegister').classList.remove('hidden');
+                document.getElementById('stopRegisterCamera').classList.remove('hidden');
+                
+                showStatus('Registration camera started', 'success');
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                showStatus('Could not access camera for registration', 'error');
+            }
+        }
+
+        function stopRegisterCamera() {
+            if (registerStream) {
+                registerStream.getTracks().forEach(track => track.stop());
+                registerStream = null;
+            }
+            
+            const video = document.getElementById('registerVideo');
+            video.srcObject = null;
+            video.style.display = 'none';
+            
+            document.getElementById('startRegisterCamera').classList.remove('hidden');
+            document.getElementById('captureRegister').classList.add('hidden');
+            document.getElementById('submitRegister').classList.add('hidden');
+            document.getElementById('stopRegisterCamera').classList.add('hidden');
+            
+            capturedImageData = null;
+            showStatus('Registration camera stopped', 'info');
+        }
+
+        function captureForRegistration() {
+            const video = document.getElementById('registerVideo');
+            const canvas = document.getElementById('registerCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            document.getElementById('captureRegister').classList.add('hidden');
+            document.getElementById('submitRegister').classList.remove('hidden');
+            
+            showStatus('Photo captured! Fill in details and submit.', 'success');
+        }
+
+        async function submitRegistration() {
+            const name = document.getElementById('userName').value.trim();
+            const roll = document.getElementById('userRoll').value.trim();
+            const branch = document.getElementById('userBranch').value.trim();
+            
+            if (!name || !roll || !branch || !capturedImageData) {
+                showStatus('Please fill all fields and capture a photo', 'error');
+                return;
+            }
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch('/api/add_user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        roll: roll,
+                        branch: branch,
+                        image: capturedImageData
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus('User registered successfully!', 'success');
+                    
+                    // Reset form
+                    document.getElementById('registerForm').reset();
+                    document.getElementById('userBranch').value = 'CSE';
+                    stopRegisterCamera();
+                    
+                    // Switch to attendance tab
+                    setTimeout(() => {
+                        switchTab('attendance');
+                        location.reload();
+                    }, 2000);
+                } else {
+                    showStatus(result.error || 'Registration failed', 'error');
+                }
+            } catch (err) {
+                console.error('Registration error:', err);
+                showStatus('Network error during registration', 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function downloadAttendance() {
+            window.location.href = '/download';
+        }
+
+        // Install PWA prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Show install button or banner
+            const installButton = document.createElement('button');
+            installButton.textContent = '📱 Install App';
+            installButton.className = 'mobile-btn btn-primary';
+            installButton.onclick = async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                    installButton.remove();
+                }
+            };
+            
+            document.querySelector('.mobile-container').appendChild(installButton);
+        });
+
+        // Handle app installation
+        window.addEventListener('appinstalled', () => {
+            showStatus('App installed successfully!', 'success');
+        });
+
+        // Service worker registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then((registration) => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch((registrationError) => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
